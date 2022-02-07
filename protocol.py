@@ -3,7 +3,7 @@ import time
 import gzip
 
 SERVER_NAME = "&4TEST_SERVER"
-SERVER_MOTD = "&aYER MUM GAY"
+SERVER_MOTD = "&aWelcome traveller"
 
 playerCount = 0
 def ping(conn):
