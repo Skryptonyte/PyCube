@@ -56,6 +56,8 @@ def spawnPlayer(conn,playerID,playerName,x,y,z,heading,pitch):
     player = struct.pack('!b',playerID)
     
     playerNameConv = bytes(playerName+" "*(64 - len(playerName)),'utf-8')
+    
+    print(x,y,z)
     X = struct.pack('!h',x)
     Y = struct.pack('!h',y)
     Z = struct.pack('!h',z)
@@ -275,7 +277,12 @@ def clientMessage(connList, playerID,data, conn, world):
     
     if (message[0]  != '/'):
         message = "&f"+playerIDToName[playerID] + ": " + message
-        serverMessageBroadcast(connList, message)
+
+        serverMessageBroadcast(connList,message)
+        if (len(message) > 64):
+            message2 = "&f"+message[64:]
+            serverMessageBroadcast(connList,message2)
+        
 
     else:
         args = message.split(" ")
@@ -288,8 +295,9 @@ def clientMessage(connList, playerID,data, conn, world):
             else:
                 disconnectPlayer(connList[playerNameToID[args[1]]],"You have been kicked for being a sussy baka.")
         elif (args[0] == "/save"):
-            serverMessage(conn,"Saving World...")
+            serverMessageBroadcast(connList,"Saving World...")
             world.saveWorld()
+            serverMessageBroadcast(connList,"Saving Complete..")
         elif (args[0] == "/op"):
             if (len(args) < 2):
                 serverMessage(conn, "Syntax: /op <player>")

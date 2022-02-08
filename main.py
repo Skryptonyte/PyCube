@@ -3,8 +3,9 @@ import threading
 import protocol
 import time
 import gzip
+import os
 
-from MCClassicLevel import MCClassicLevel
+from MCClassicLevel import *
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -12,7 +13,11 @@ s.bind(('127.0.0.1', 25565))
 s.listen()
 
 
-world = MCClassicLevel("maps/main.lvl")
+if (not os.path.exists("maps/world.lvl")):
+    generateFlatWorld("maps/world.lvl",128,64,128)
+#world = MCClassicLevel("maps/main.lvl")
+world = MCClassicLevel("maps/world.lvl")
+
 connList = [None]*128
 
 
@@ -23,19 +28,7 @@ def findMinAvailableID():
             
     return -1
 def processClient(playerID,conn,addr):
-    """
-    while True:
 
-        data = conn.recv(1024)
-        if (data):
-            packetID = int(data[0])
-            print("Address: ", addr,"Packet ID: ",packetID,len(data))
-            
-            connList[playerID] = conn
-            
-            if (packetID in protocol.clientPacketDict.keys()):
-                protocol.clientPacketDict[packetID](connList,playerID,data,conn,world)
-    """
     buffer = b''
     packetID = None
     

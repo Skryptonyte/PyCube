@@ -7,10 +7,11 @@ worldlock = threading.Lock()
 class MCClassicLevel:
     def __init__(self, fileName):
 
-        world = gzip.open(fileName).read()
+        world = bytearray(gzip.open(fileName).read())
+
         self.fileName = fileName
-        self.worldArray = list(world)
         self.world = world
+
         self.worldX = struct.unpack('h',world[2:4])[0]
         self.worldZ = struct.unpack('h',world[4:6])[0]
         self.worldY = struct.unpack('h',world[6:8])[0]
@@ -28,11 +29,10 @@ class MCClassicLevel:
                 
         calculatedIndex = 18+x + self.worldX*(z+self.worldZ*y)
         if (mode == 1):
-            self.worldArray[calculatedIndex] = block
+            self.world[calculatedIndex] = block
         elif (mode == 0):
-            self.worldArray[calculatedIndex] = 0
+            self.world[calculatedIndex] = 0
                 
-        self.world = bytes(self.worldArray)
         
     def saveWorld(self):
         print("[INFO] Saving world!")
@@ -43,3 +43,50 @@ class MCClassicLevel:
         
         
         
+def generateFlatWorld(fileName,worldX, worldY, worldZ):
+    print("Generating new flat world at", fileName)
+    volume = worldX*worldY*worldZ
+    blocksArray = bytearray(volume)
+    
+    f = gzip.open(fileName,"wb+")
+    
+    f.write(struct.pack('h',1874))
+    
+    f.write(struct.pack('h',worldX))
+    f.write(struct.pack('h',worldZ))
+    f.write(struct.pack('h',worldY))
+    
+    
+    spawnX = 0
+    spawnY = (worldY >> 1) + 1
+    spawnZ = 0
+    f.write(struct.pack('h',spawnX))
+    f.write(struct.pack('h',spawnZ))
+    f.write(struct.pack('h',spawnY))
+    
+    f.write(struct.pack('B',0))
+    f.write(struct.pack('B',0))
+    
+    f.write(struct.pack('B',0))
+    f.write(struct.pack('B',0))
+    
+    maxY = worldY >> 1
+    
+    print("Calculating")
+    for y in range(maxY):
+        for x in range(worldX):
+            for z in range(worldZ):
+                
+                calculatedIndex = x + worldX*(z+worldZ*y)
+                
+                if (y == maxY-1):
+                    blocksArray[calculatedIndex] = 2
+                else:
+                    blocksArray[calculatedIndex] = 3
+                
+                
+    print("Writing to file")
+    f.write(blocksArray)
+        
+    f.close()
+    print("Finished")
