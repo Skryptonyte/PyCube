@@ -6,7 +6,7 @@ An MC Classic/ClassiCube server written in Python
 
 * Standard MC Classic Protocol implemented
 * Few commands: /kick, /save, /op
-* Loads file at maps/main.lvl, must be of MCSharp/MCGalaxy format
+* Flat world generator
 
 ## TODO
 
@@ -14,6 +14,4 @@ An MC Classic/ClassiCube server written in Python
 * Cleaner error handling
 * More commands
 * Classic Protocol Extension (CPE)
-* A built in world generator
-
 
