@@ -14,7 +14,7 @@ s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
 
-s.bind(('127.0.0.1', 25565))
+s.bind(('0.0.0.0', 25565))
 s.listen()
 
 
