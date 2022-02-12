@@ -5,8 +5,9 @@ An MC Classic/ClassiCube server written in Python
 ## Features
 
 * Standard MC Classic Protocol implemented
-* Few commands: /kick, /save, /op
-* Flat world generator
+* Commands: /kick, /save, /op, /deop,/tp, maps, /goto
+* Flat world generator (run the MCClassicLevel.py to generate custom flat worlds)
+* Multi Map system
 
 ## TODO
 
