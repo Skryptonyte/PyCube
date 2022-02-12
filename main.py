@@ -85,14 +85,15 @@ def pingEveryone(server):
                     
                     player = server.playerData.get(p,None)
                     
+
                     if (player):
                         username = player.playerName
 
-                    protocol.despawnPlayerBroadcast(connList,p)
-                    protocol.serverMessageBroadcast(connList,username + " has left the game.")
+                        protocol.despawnPlayerBroadcast(connList,p)
+                        protocol.serverMessageBroadcast(connList,username + " has left the game.")
 
-                    server.removePlayer(p)                                        
-                    allocatedSlots[p] = 0
+                        server.removePlayer(p)                                        
+                        allocatedSlots[p] = 0
                     
                     
         time.sleep(0.5)
