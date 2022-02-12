@@ -328,7 +328,10 @@ def clientMessage(playerID,data, conn, server):
 
     else:
         args = message.split(" ")
-        Commands.commandTable.get(args[0],Commands.fallbackCommand)(server, playerID, conn, args)
+        try:
+            Commands.commandTable.get(args[0],Commands.fallbackCommand)(server, playerID, conn, args)
+        except Exception as e:
+            print("Exception occurred during player command: "+str(e))
     
     
 

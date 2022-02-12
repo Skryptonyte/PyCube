@@ -95,7 +95,7 @@ def pingEveryone(server):
                     allocatedSlots[p] = 0
                     
                     
-        time.sleep(2)
+        time.sleep(0.5)
 if __name__ == "__main__":    
     pingThread = threading.Thread(target=pingEveryone, args=(server,))
     pingThread.start()
