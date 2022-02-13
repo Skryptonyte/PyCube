@@ -5,6 +5,8 @@ import time
 import gzip
 import os
 
+import heartbeat
+
 from MCClassicLevel import *
 from Server import Server
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -101,6 +103,8 @@ if __name__ == "__main__":
     pingThread = threading.Thread(target=pingEveryone, args=(server,))
     pingThread.start()
 
+    heartBeatThread = threading.Thread(target=heartbeat.heartbeat, args=(server.SERVER_NAME, 25565, 10))
+    heartBeatThread.start()
     while True:
         conn, addr = s.accept()
         

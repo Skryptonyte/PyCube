@@ -58,6 +58,7 @@ def levelFinalize(conn,x,y,z):
         pass
 
 def loadWorld(server, conn, world, playerID):
+    print("Loading world "+ world.fileName +"for player: "+str(playerID))
     username = server.playerData[playerID].playerName
     worldX = world.worldX
     worldZ = world.worldZ
@@ -89,7 +90,7 @@ def loadWorld(server, conn, world, playerID):
                 pass
 
     positionUpdate(conn,-1,spawnX,spawnY,spawnZ,heading,pitch)
-
+    print("Loading complete")
             
 def spawnPlayer(conn,playerID,playerName,x,y,z,heading,pitch):
     global playerCount
@@ -97,6 +98,7 @@ def spawnPlayer(conn,playerID,playerName,x,y,z,heading,pitch):
     packetID = struct.pack('!B',0x07)
     player = struct.pack('!b',playerID)
     
+    playerName = playerName[0:64]
     playerNameConv = bytes(playerName+" "*(64 - len(playerName)),'utf-8')
     
     print(x,y,z)
@@ -248,10 +250,11 @@ def playerIdentification(playerID,data,conn,server):
     #print(data)
 
     packetIDS = bytes((0,))
-    serverProtocol = bytes((data[1],))
+    serverProtocol = bytes((7,))
     serverName = bytes(server.SERVER_NAME + " "*(64 - len(server.SERVER_NAME)),'utf-8')
     serverMOTD = bytes(server.SERVER_MOTD + " "*(64 - len(server.SERVER_MOTD)),'utf-8')
     userType = bytes((0,))
+
 
     newMessage = packetIDS + serverProtocol + serverName +serverMOTD + userType
     print(newMessage)
