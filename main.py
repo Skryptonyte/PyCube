@@ -56,6 +56,7 @@ def processClient(playerID,conn,addr):
             pass
         elif (packetID not in protocol.clientPacketDict.keys()):
             print("Invalid packet ID receieved.. Termination connection")
+            print("DEBUG buffer: "+buffer)
             conn.close()
             return
 
@@ -67,6 +68,11 @@ def processClient(playerID,conn,addr):
             
             if (packetID in protocol.clientPacketDict.keys()):
                 protocol.clientPacketDict[packetID](playerID,packetData,conn,server)
+            else:
+                print("Invalid packet ID received.. Terminating connection")
+                print("DEBUG buffer: "+buffer)
+                conn.close()
+                return
             if (len(buffer) > 0):
                 packetID = int(buffer[0])
 
@@ -116,9 +122,3 @@ if __name__ == "__main__":
         t1 = threading.Thread(target=processClient,args=(playerID,conn,addr))
         print("New connection from address:",addr," with player ID: ", playerID);
         t1.start()
-        
-        
-    s.close()
-
-
-
