@@ -26,8 +26,8 @@ server = Server("PyCube Test Server","Welcome Traveller")
 allocatedSlots = [0]*128
 def findMinAvailableID():
     for i in range(128):
-        if (allocatedSlots[i] == 0):
-            allocatedSlots[i] = 1
+        if (server.allocatedSlots[i] == 0):
+            server.allocatedSlots[i] = 1
             return i
             
     return -1
@@ -57,8 +57,8 @@ def processClient(playerID,conn,addr):
         elif (packetID not in protocol.clientPacketDict.keys()):
             print("Invalid packet ID receieved.. Termination connection")
             print("DEBUG buffer: ")
+            protocol.disconnectPlayer(playerID,conn,"Server: Rejected invalid packet ID: "+str(packetID))
             print(buffer)
-            conn.close()
             return
 
         while (len(buffer) > 0 and protocol.clientPacketLengths[packetID] <= len(buffer)):
@@ -73,7 +73,7 @@ def processClient(playerID,conn,addr):
                 print("Invalid packet ID received.. Terminating connection")
                 print("DEBUG buffer: ")
                 print(buffer)
-                conn.close()
+                protocol.disconnectPlayer(playerID,conn,"Server: Rejected invalid packet ID: "+str(packetID))
                 return
             if (len(buffer) > 0):
                 packetID = int(buffer[0])
@@ -87,32 +87,20 @@ def pingEveryone(server):
     while True:
         for p in range(128):
             if (connList[p] != None):
-                try:
-                    protocol.ping(connList[p])
-                except:
-                    print("Player disconnected, ID:",p)
-                    connList[p] = None
-                    
-                    player = server.playerData.get(p,None)
-                    
-
-                    if (player):
-                        username = player.playerName
-
-                        protocol.despawnPlayerBroadcast(connList,p)
-                        protocol.serverMessageBroadcast(connList,username + " has left the game.")
-
-                        server.removePlayer(p)                                        
-                        allocatedSlots[p] = 0
-                    
+                print("PING "+str(p))
+                protocol.ping(server, connList[p])
                     
         time.sleep(0.5)
+
+
 if __name__ == "__main__":    
     pingThread = threading.Thread(target=pingEveryone, args=(server,))
     pingThread.start()
 
     heartBeatThread = threading.Thread(target=heartbeat.heartbeat, args=(server.SERVER_NAME, 25565, 10))
     heartBeatThread.start()
+
+
     while True:
         conn, addr = s.accept()
         
@@ -120,7 +108,11 @@ if __name__ == "__main__":
         if (playerID < 0):
             continue
         server.connList[playerID] = conn
+        server.addPlayerID("",playerID,conn)
+
+        workerThread = threading.Thread(target=server.workerThread,args=(server, playerID, ))
+        workerThread.start()
 
         t1 = threading.Thread(target=processClient,args=(playerID,conn,addr))
-        print("New connection from address:",addr," with player ID: ", playerID);
+        print("New connection from address:",addr," with player ID: ", playerID)
         t1.start()

@@ -4,22 +4,26 @@ import gzip
 
 import Commands
 
+def sendMessage(conn, server,data):
+    playerID = server.connList.index(conn)
+    server.playerData[playerID].messageQueue.put((playerID, data))
 playerCount = 0
-def ping(conn):
+def ping(server,conn):
     data = struct.pack('!B',0x01)
     #print("PING sent")
-    conn.sendall(data)
+    sendMessage(conn, server, data)
+    #sendMessage(conn, server, data)
 
-def levelInitialize(conn):
+def levelInitialize(server,conn):
     data = struct.pack('!B',0x02)
-    print("INITIALIZE LEVEL")
+    #print("INITIALIZE LEVEL")
     try:
-        conn.sendall(data)
+        sendMessage(conn, server, data)
     except:
         pass
 
 
-def levelChunk(conn,world):
+def levelChunk(server,conn,world):
     packetID = struct.pack('!B',0x03)
     percentComplete = struct.pack('!B',0)
 
@@ -37,23 +41,23 @@ def levelChunk(conn,world):
         #print("LOAD CHUNK OF SIZE: ",len(data))
         #print("-- DATA:",(data),chunkLengthInt)
         try:
-            conn.sendall(data)
+            sendMessage(conn, server, data)
         except:
             print("[WARN]: Failed to send world data to somebody")
             return
         index+= 1024
         
 
-def levelFinalize(conn,x,y,z):
+def levelFinalize(server,conn,x,y,z):
     packetID = struct.pack('!B',0x04)
     X = struct.pack('!h',x)
     Y = struct.pack('!h',y)
     Z = struct.pack('!h',z)
     data = packetID + X + Y + Z
-    print("FINALIZE LEVEL")
+    #print("FINALIZE LEVEL")
     print(data)
     try:
-        conn.sendall(data)
+        sendMessage(conn, server, data)
     except:
         pass
 
@@ -71,28 +75,27 @@ def loadWorld(server, conn, world, playerID):
     heading = world.heading
     pitch = world.pitch
 
-    despawnPlayerBroadcast(server.connList,playerID)
+    despawnPlayerBroadcast(server, server.connList,playerID)
     server.playerData[playerID].world = world
 
-    levelInitialize(conn)
-    levelChunk(conn, world)
-    levelFinalize(conn,worldX, worldY, worldZ)
-    positionUpdate(conn,-1,spawnX,spawnY,spawnZ,heading,pitch)
+    levelInitialize(server,conn)
+    levelChunk(server,conn, world)
+    levelFinalize(server, conn,worldX, worldY, worldZ)
+    positionUpdate(server, conn,-1,spawnX,spawnY,spawnZ,heading,pitch)
 
-    spawnPlayer(conn,-1,username,spawnX,spawnY,spawnZ,heading,pitch)
+    spawnPlayer(server,conn,-1,username,spawnX,spawnY,spawnZ,heading,pitch)
     for p in range(128):
         try:
             if (server.connList[p] and p != playerID and server.playerData[p].world == server.playerData[playerID].world):
-                spawnPlayer(server.connList[p],playerID,username,spawnX,spawnY,spawnZ,heading,pitch)     # Spawn player in everyone else's clients
-                spawnPlayer(conn,p,server.playerData[p].playerName,spawnX,spawnY,spawnZ,heading,pitch)   # Spawn all players in our client
-                print("Found player ID: ",p)
+                spawnPlayer(server,server.connList[p],playerID,username,spawnX,spawnY,spawnZ,heading,pitch)     # Spawn player in everyone else's clients
+                spawnPlayer(server,conn,p,server.playerData[p].playerName,spawnX,spawnY,spawnZ,heading,pitch)   # Spawn all players in our client
         except Exception as e:
                 pass
 
-    positionUpdate(conn,-1,spawnX,spawnY,spawnZ,heading,pitch)
+    positionUpdate(server,conn,-1,spawnX,spawnY,spawnZ,heading,pitch)
     print("Loading complete")
             
-def spawnPlayer(conn,playerID,playerName,x,y,z,heading,pitch):
+def spawnPlayer(server,conn,playerID,playerName,x,y,z,heading,pitch):
     global playerCount
     
     packetID = struct.pack('!B',0x07)
@@ -109,14 +112,14 @@ def spawnPlayer(conn,playerID,playerName,x,y,z,heading,pitch):
     P = struct.pack('!B',pitch)
     
     data = packetID + player + playerNameConv + X+Y+Z+H+P
-    print("SPAWN PLAYER:",playerName,"with ID:",player)
+    #print("SPAWN PLAYER:",playerName,"with ID:",player)
     print(data)
     try:
-        conn.sendall(data)
+        sendMessage(conn, server, data)
     except:
         pass
     
-def positionUpdate(conn,playerID, x, y, z, heading, pitch):
+def positionUpdate(server, conn,playerID, x, y, z, heading, pitch):
 
     packetID = struct.pack('!B',0x08)
     playeridconv = struct.pack('!b',playerID)
@@ -128,46 +131,45 @@ def positionUpdate(conn,playerID, x, y, z, heading, pitch):
     
     data = packetID + playeridconv + X + Y + Z + H + P
     try:
-        conn.sendall(data)
+        sendMessage(conn, server, data)
     except:
         pass
 
 
 
 
-def despawnPlayer(conn,playerID):
+def despawnPlayer(server, conn,playerID):
     packetID = struct.pack('!B',0x0c)
     playerID = struct.pack('!b',playerID)
     
     data = packetID + playerID
     try:
-        conn.sendall(data)
+        sendMessage(conn, server, data)
     except:
         pass
     
-def despawnPlayerBroadcast(connList, playerID):
+def despawnPlayerBroadcast(server, connList, playerID):
+    print("BROADCAST DESPAWN")
     for p in range(128):
         if (connList[p] != None):
-            try:
-                despawnPlayer(connList[p],playerID)
-            except:
-                pass
+            despawnPlayer(server,connList[p],playerID)
             
 
 
 
-def serverMessage(conn, message):
+def serverMessage(server, conn, message):
     packetID = struct.pack('!B',0x0d)
     unused = struct.pack('!B',0xff)
     message = bytes(message[0:64] + " "*(64-len(message)),'utf-8')
     
+
     data = packetID+unused+message
     try:
-        conn.sendall(data)
+        sendMessage(conn, server, data)
     except:
         pass
     
-def serverMessageBroadcast(connList, message):
+def serverMessageBroadcast(server, connList, message):
             
     packetID = struct.pack('!B',0x0d)
     unused = struct.pack('!B',0xff)
@@ -177,11 +179,11 @@ def serverMessageBroadcast(connList, message):
     for p in range(128):
         if (connList[p] != None):
             try:
-                connList[p].sendall(data)
+                sendMessage(connList[p], server, data)
             except:
                 pass
 
-def serverBlockUpdate(conn, x,y,z,block):
+def serverBlockUpdate(server,conn, x,y,z,block):
     packetID = struct.pack('!B',0x06)
     X = struct.pack('!h',x)
     Y = struct.pack('!h',y)
@@ -190,34 +192,34 @@ def serverBlockUpdate(conn, x,y,z,block):
     
     data = packetID + X + Y + Z + B
     try:
-        conn.sendall(data)
+        sendMessage(conn, server, data)
     except:
         pass
     
 def serverBlockUpdateBroadcast(server, sendingID, connList, x, y, z, block):
     for p in range(128):
         if (connList[p] != None and server.playerData[sendingID].world == server.playerData[p].world):
-            serverBlockUpdate(connList[p],x,y,z,block)
+            serverBlockUpdate(server,connList[p],x,y,z,block)
                 
                 
-def disconnectPlayer(conn,disconnectReason):
+def disconnectPlayer(server, conn,disconnectReason):
     packetID = struct.pack('!B',0x0e)
     disconnectReason = bytes(disconnectReason + " "*(64-len(disconnectReason)),'utf-8')
     
     data = packetID + disconnectReason
     try:
-        conn.sendall(data)
+        sendMessage(conn, server, data)
     except:
         pass
 
 
-def updateUserType(conn, userType):
+def updateUserType(server, conn, userType):
     packetID = struct.pack('!B',0x0f)
     userType = struct.pack('!B',userType)
     
     data = packetID + userType
     try:
-        conn.sendall(data)
+        sendMessage(conn, server, data)
     except:
         pass
 
@@ -243,11 +245,13 @@ def playerIdentification(playerID,data,conn,server):
     verificationKey = (data[66:130]).decode("utf-8").strip()
 
     if (username in server.playerNameData.keys()):
-        disconnectPlayer(conn,"Already logged in")
+        disconnectPlayer(server, conn,"Already logged in")
         return
     
-    server.addPlayerID(username,playerID, conn)
+    #server.addPlayerID(username,playerID, conn)
     #print(data)
+    server.playerData[playerID].playerName = username
+    server.playerNameData[username] = server.playerData[playerID]
 
     packetIDS = bytes((0,))
     serverProtocol = bytes((7,))
@@ -258,10 +262,10 @@ def playerIdentification(playerID,data,conn,server):
 
     newMessage = packetIDS + serverProtocol + serverName +serverMOTD + userType
     print(newMessage)
-    conn.sendall(newMessage)
+    sendMessage(conn, server, newMessage)
 
     loadWorld(server,conn,world,playerID)
-    serverMessageBroadcast(connList, username + " has joined the world.")
+    serverMessageBroadcast(server,connList, username + " has joined the world.")
 
 def clientPositionUpdate(playerID,data, conn, server):
 
@@ -282,7 +286,7 @@ def clientPositionUpdate(playerID,data, conn, server):
     for p in range(128):
         try:
             if (connList[p] and p != playerID and server.playerData[playerID].world == server.playerData[p].world):
-                positionUpdate(connList[p],playerID,x,y,z,h,p)
+                positionUpdate(server,connList[p],playerID,x,y,z,h,p)
         except:
             pass
     
@@ -323,10 +327,10 @@ def clientMessage(playerID,data, conn, server):
     if (message[0]  != '/'):
         message = "&f"+username + ": " + message
 
-        serverMessageBroadcast(connList,message)
+        serverMessageBroadcast(server,connList,message)
         if (len(message) > 64):
             message2 = "&f"+message[64:]
-            serverMessageBroadcast(connList,message2)
+            serverMessageBroadcast(server, connList,message2)
         
 
     else:

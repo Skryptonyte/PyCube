@@ -102,55 +102,6 @@ def generateFlatWorld(fileName,worldX, worldY, worldZ):
     print("Finished")
     
 
-def generateFlatWorld(fileName,worldX, worldY, worldZ):
-    print("Generating new flat world at", fileName)
-    volume = worldX*worldY*worldZ
-    blocksArray = bytearray(volume)
-    
-    f = gzip.open(fileName,"wb+")
-    
-    f.write(struct.pack('h',1874))
-    
-    f.write(struct.pack('h',worldX))
-    f.write(struct.pack('h',worldZ))
-    f.write(struct.pack('h',worldY))
-    
-    
-    spawnX = worldX >> 1
-    spawnY = (worldY >> 1) + 1
-    spawnZ = worldZ >> 1
-    f.write(struct.pack('h',spawnX))
-    f.write(struct.pack('h',spawnZ))
-    f.write(struct.pack('h',spawnY))
-    
-    f.write(struct.pack('B',0))
-    f.write(struct.pack('B',0))
-    
-    f.write(struct.pack('B',0))
-    f.write(struct.pack('B',0))
-    
-    maxY = worldY >> 1
-    
-    print("Calculating")
-    for y in range(maxY):
-        for x in range(worldX):
-            for z in range(worldZ):
-                
-                calculatedIndex = x + worldX*(z+worldZ*y)
-                
-                if (y == maxY-1):
-                    blocksArray[calculatedIndex] = 2
-                else:
-                    blocksArray[calculatedIndex] = 3
-                
-                
-    print("Writing to file")
-    f.write(blocksArray)
-        
-    f.close()
-    print("Finished")
-    
-
 # EXPERIMENTAL
 """
 import opensimplex
