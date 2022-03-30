@@ -157,22 +157,23 @@ def despawnPlayerBroadcast(server, connList, playerID):
 
 
 
-def serverMessage(server, conn, message):
+def serverMessage(server, conn, message, messageType=0x0):
     packetID = struct.pack('!B',0x0d)
-    unused = struct.pack('!B',0xff)
+    unused = struct.pack('!B',messageType)
     message = bytes(message[0:64] + " "*(64-len(message)),'utf-8')
     
 
     data = packetID+unused+message
     try:
         sendMessage(conn, server, data)
-    except:
+    except Exception as e:
+        print(e)
         pass
     
-def serverMessageBroadcast(server, connList, message):
+def serverMessageBroadcast(server, connList, message,messageType=0x0):
             
     packetID = struct.pack('!B',0x0d)
-    unused = struct.pack('!B',0xff)
+    unused = struct.pack('!B',messageType)
     message = bytes(message[0:64] + " "*(64-len(message)),'utf-8')
     
     data = packetID+unused+message
@@ -180,7 +181,8 @@ def serverMessageBroadcast(server, connList, message):
         if (connList[p] != None):
             try:
                 sendMessage(connList[p], server, data)
-            except:
+            except Exception as e:
+                print(e)
                 pass
 
 def serverBlockUpdate(server,conn, x,y,z,block):
@@ -209,7 +211,8 @@ def disconnectPlayer(server, conn,disconnectReason):
     data = packetID + disconnectReason
     try:
         sendMessage(conn, server, data)
-    except:
+    except Exception as e:
+        print(e)
         pass
 
 
@@ -223,16 +226,26 @@ def updateUserType(server, conn, userType):
     except:
         pass
 
-serverPacketDict = {0x01: ping,
-                    0x02: levelInitialize,
-                    0x03: levelChunk,
-                    0x04: levelFinalize,
-                    0x07: spawnPlayer,
-                    0x08: positionUpdate,
-                    0x0c: despawnPlayer,
-                    0x0d: serverMessage,
-                    0x0e: disconnectPlayer
-                    }
+def serverIdentification(playerID, conn, server):
+
+    world = server.worlds["world"]
+    connList = server.connList
+
+    packetIDS = bytes((0,))
+    serverProtocol = bytes((7,))
+    serverName = bytes(server.SERVER_NAME + " "*(64 - len(server.SERVER_NAME)),'utf-8')
+    serverMOTD = bytes(server.SERVER_MOTD + " "*(64 - len(server.SERVER_MOTD)),'utf-8')
+    userType = bytes((0,))
+
+
+    newMessage = packetIDS + serverProtocol + serverName +serverMOTD + userType
+    sendMessage(conn, server, newMessage)
+
+    loadWorld(server,conn,world,playerID)
+    serverMessageBroadcast(server,connList, server.playerData[playerID].playerName + " has joined the world.")
+
+    serverMessage(server,conn,server.SERVER_VERSION,1)
+    serverMessage(server,conn,"&cVery Unstable",2)
 
 def playerIdentification(playerID,data,conn,server):
 
@@ -243,7 +256,7 @@ def playerIdentification(playerID,data,conn,server):
     protocolVersion = data[1]
     username = (data[2:66]).decode("utf-8").strip()
     verificationKey = (data[66:130]).decode("utf-8").strip()
-
+    padding = int(data[130])
     if (username in server.playerNameData.keys()):
         disconnectPlayer(server, conn,"Already logged in")
         return
@@ -253,6 +266,15 @@ def playerIdentification(playerID,data,conn,server):
     server.playerData[playerID].playerName = username
     server.playerNameData[username] = server.playerData[playerID]
 
+    # Detect CPE
+    if (padding == 0x42):
+        print("Note: Client supports CPE")
+        extInfoPacketServer(playerID, conn, server, 2)
+        for cpeExtName in server.CPE:
+            extEntryPacketServer(playerID,conn,server, cpeExtName,server.CPE[cpeExtName])
+    else:
+        serverIdentification(playerID, conn, server)
+    """
     packetIDS = bytes((0,))
     serverProtocol = bytes((7,))
     serverName = bytes(server.SERVER_NAME + " "*(64 - len(server.SERVER_NAME)),'utf-8')
@@ -261,12 +283,11 @@ def playerIdentification(playerID,data,conn,server):
 
 
     newMessage = packetIDS + serverProtocol + serverName +serverMOTD + userType
-    print(newMessage)
     sendMessage(conn, server, newMessage)
 
     loadWorld(server,conn,world,playerID)
     serverMessageBroadcast(server,connList, username + " has joined the world.")
-
+    """
 def clientPositionUpdate(playerID,data, conn, server):
 
     world = server.playerData[playerID].world
@@ -280,6 +301,13 @@ def clientPositionUpdate(playerID,data, conn, server):
     h = struct.unpack('!B',data[8:9])[0]
     p = struct.unpack('!B',data[9:10])[0]
     
+
+    X = server.playerData[playerID].positionX
+    Y = server.playerData[playerID].positionY
+    Z = server.playerData[playerID].positionZ
+
+    if (x == X and y == Y and z == Z):
+        return
     #print("Player ID:",playerIDr,"POSITION UPDATE:",x>>5,y>>5,z>>5)
 
     server.playerData[playerID].setPosition(x,y,z)
@@ -331,7 +359,6 @@ def clientMessage(playerID,data, conn, server):
         if (len(message) > 64):
             message2 = "&f"+message[64:]
             serverMessageBroadcast(server, connList,message2)
-        
 
     else:
         args = message.split(" ")
@@ -340,9 +367,104 @@ def clientMessage(playerID,data, conn, server):
         except Exception as e:
             print("Exception occurred during player command: "+str(e))
     
+ # CPE Packets
+
+def extInfoPacketServer(playerID, conn, server, extCount):
+    packetID = struct.pack('!B',0x10)
+    serverInfo =  bytes(server.SERVER_VERSION + " "*(64 - len(server.SERVER_VERSION)),'utf-8')
+    extensionCount = struct.pack('!h',extCount)
+
+    packet = packetID + serverInfo + extensionCount
+
+    sendMessage(conn,server,packet)
+
+def extEntryPacketServer(playerID, conn, server, extName, version):
+    packetID = struct.pack('!B',0x11)
+    extName = bytes(extName + " "*(64 - len(extName)),'utf-8')
+    extVersion = struct.pack('!I',version)
+
+    packet = packetID + extName + extVersion
+    sendMessage(conn,server,packet)
+
+def extInfoPacketClient(playerID, data, conn, server):
+    packetID = struct.unpack('!B', data[0:1])
+    serverInfo = data[1:65]
+    extensionCount = struct.unpack('!h',data[65:67])[0]
+
+    server.playerData[playerID]._extensionsLeft = extensionCount
+
+def extEntryPacketClient(playerID, data, conn, server):
+    packetID = struct.unpack('!B', data[0:1])
+    extName = data[1:65]
+    version = struct.unpack('!I',data[65:69])[0]
+
+    #print("Client reports CPE Extension:",extName.decode('utf-8'),"Version:",version)
+    server.playerData[playerID]._extensionsLeft -= 1
+
+    trimmedName = extName.decode('utf-8').strip()
+    if (server.CPE.get(trimmedName,0) == version):
+        server.playerData[playerID].CPE[trimmedName] = version
+        print("Mutually Supported Extension:",trimmedName,"Version:",version)
+    if (server.playerData[playerID]._extensionsLeft == 0):
+        print("Finished CPE Handshake")
+        serverIdentification(playerID, conn, server)
+
+        CPE_clickDistance(playerID, conn, server, 320)
+        CPE_customBlocks(playerID, conn, server)
+
+        server.playerData[playerID]._extensionsLeft -= 1
+
+
+
+def CPE_clickDistance(playerID, conn, server, clickDist):
+    packetID = struct.pack('!B',0x12)
+    clickDist = struct.pack('!h',clickDist)
+
+    packet = packetID + clickDist
+    sendMessage(conn,server,packet)
+
+def CPE_customBlocks(playerID, conn, server):
+    packetID = struct.pack('!B', 0x13)
+    supportLevel = struct.pack('!B',0x1)
+
+    packet = packetID + supportLevel
+    sendMessage(conn,server,packet)
+
+def CPE_customBlocks_client(playerID, data, conn, server):
+    packetID = struct.unpack('!B', data[0:1])
+    supportLevel = struct.unpack('!B',data[1:2])
+
+
+def CPE_twoWayPing_client(playerID, data, conn, server):
+    packetID = struct.unpack('!B',data[0:1])
+    direction = struct.unpack('!B',data[1:2])
+    counter = struct.unpack('!h',data[2:4])
+
+
+    retPacket = data[0:1] + struct.pack('!B',0) + data[2:4]
+    print("Two way ping")
+    sendMessage(conn,server,retPacket)
+serverPacketDict = {0x01: ping,
+                    0x02: levelInitialize,
+                    0x03: levelChunk,
+                    0x04: levelFinalize,
+                    0x07: spawnPlayer,
+                    0x08: positionUpdate,
+                    0x0c: despawnPlayer,
+                    0x0d: serverMessage,
+                    0x0e: disconnectPlayer
+                    }
     
 
-    
-
-clientPacketDict = {0x0 : playerIdentification, 0x05:clientBlockUpdate,0x8: clientPositionUpdate, 0xd: clientMessage}
-clientPacketLengths = {0x0: 131, 0x05: 9, 0x08: 10, 0x0d:66}
+clientPacketDict = {0x0 : playerIdentification, 
+                    0x05:clientBlockUpdate,
+                    0x8: clientPositionUpdate, 
+                    0xd: clientMessage,
+                    
+                    0x10: extInfoPacketClient,
+                    0x11: extEntryPacketClient,
+                    0x13: CPE_customBlocks_client,
+                    0x2b: CPE_twoWayPing_client
+                    }
+clientPacketLengths = {0x0: 131, 0x05: 9, 0x08: 10, 0x0d:66,
+                    0x10:67, 0x11: 69,0x13: 2, 0x2b: 4}

@@ -11,7 +11,7 @@ def heartbeat(server_name,port_num,player_count):
         parameters["public"] = True
         parameters["version"] = 7
         parameters["salt"] = "0123456789abcdef"
-        parameters["software"] = "PyCube 0.0.2"
+        parameters["software"] = "PyCube 0.1.0"
 
         r = requests.get(url = url, params = parameters)
 

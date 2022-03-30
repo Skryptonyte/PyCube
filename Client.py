@@ -2,8 +2,13 @@ import queue
 
 class Client:
     def __init__(self,playerName,playerID,conn,server):
+
+        self._extensionsLeft = -1
+
+
         self.playerName = playerName
         self.playerID = playerID
+        self.CPE = {}
         
         self.positionX = 0
         self.positionY = 0

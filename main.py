@@ -35,6 +35,7 @@ def processClient(playerID,conn,addr):
 
     buffer = b''
     packetID = None
+
     while True:
         
         try:
@@ -43,8 +44,13 @@ def processClient(playerID,conn,addr):
             print("Connection has been terminated. Ending connection")
             conn.close()
             return
+
         if (data):
             buffer += data
+        else:
+            print("Connection has been terminated. Ending connection")
+            conn.close()
+            return
         
         if (buffer):
             packetID = int(buffer[0])
@@ -55,9 +61,9 @@ def processClient(playerID,conn,addr):
             # We have receieved nothing here
             pass
         elif (packetID not in protocol.clientPacketDict.keys()):
-            print("Invalid packet ID receieved.. Termination connection")
+            print("Invalid packet ID receieved: ",packetID)
             print("DEBUG buffer: ")
-            protocol.disconnectPlayer(playerID,conn,"Server: Rejected invalid packet ID: "+str(packetID))
+            protocol.disconnectPlayer(server,conn,"Server: Rejected invalid packet ID: "+str(packetID))
             print(buffer)
             return
 
@@ -67,16 +73,17 @@ def processClient(playerID,conn,addr):
             packetData = buffer[0:expectedLength]
             buffer = buffer[expectedLength:]
             
-            if (packetID in protocol.clientPacketDict.keys()):
-                protocol.clientPacketDict[packetID](playerID,packetData,conn,server)
-            else:
-                print("Invalid packet ID received.. Terminating connection")
-                print("DEBUG buffer: ")
-                print(buffer)
-                protocol.disconnectPlayer(playerID,conn,"Server: Rejected invalid packet ID: "+str(packetID))
-                return
+            protocol.clientPacketDict[packetID](playerID,packetData,conn,server)
+
             if (len(buffer) > 0):
                 packetID = int(buffer[0])
+
+                if (packetID not in protocol.clientPacketDict.keys()):
+                    print("Invalid packet ID received: ",packetID)
+                    print("DEBUG buffer: ")
+                    print(buffer)
+                    protocol.disconnectPlayer(server,conn,"Server: Rejected invalid packet ID: "+str(packetID))
+                    return
 
 
 def pingEveryone(server):
@@ -90,7 +97,8 @@ def pingEveryone(server):
                 print("PING "+str(p))
                 protocol.ping(server, connList[p])
                     
-        time.sleep(0.5)
+        time.sleep(5)
+
 
 
 if __name__ == "__main__":    
@@ -116,3 +124,6 @@ if __name__ == "__main__":
         t1 = threading.Thread(target=processClient,args=(playerID,conn,addr))
         print("New connection from address:",addr," with player ID: ", playerID)
         t1.start()
+
+    print("Ending main thread")
+    

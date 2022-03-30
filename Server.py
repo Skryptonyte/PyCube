@@ -9,12 +9,22 @@ class Server:
     def __init__(self, SERVER_NAME, SERVER_MOTD):
         self.SERVER_NAME = SERVER_NAME
         self.SERVER_MOTD = SERVER_MOTD
+        self.SERVER_VERSION = "PyCube 0.1.0"
         
+
+        self.CPE = {}
+    
+        self.CPE["ClickDistance"] = 1
+        self.CPE["CustomBlocks"] = 1
+        self.CPE["TwoWayPing"] = 1
+        self.CPE["MessageTypes"] = 1
+
         self.playerData = {}
         self.playerNameData = {}
         self.connList = [None]*128
         self.allocatedSlots = [0]*128
         self.worlds = {}
+
         if (not os.path.exists("maps/world.lvl")):
             generateFlatWorld("maps/world.lvl",128,64,128)
             #world = MCClassicLevel("maps/main.lvl")
@@ -48,15 +58,14 @@ class Server:
             self.playerNameData.pop(playerName, None)        
         self.playerData.pop(playerID,None)
 
-    def sendMessage(self,conn,data):
-        self.messageQueue.append(conn,data)
 
     def workerThread(self,server,playerID):
-        print("Beginning worker thread")
+        print("Beginning worker thread for playerID:",playerID)
 
         connList = server.connList
         messageQueue = self.playerData[playerID].messageQueue
         while True:
+
             while ((messageQueue).qsize() > 0):
                 #print("Packets to process: "+str(messageQueue.qsize()))
                 item = messageQueue.get()
