@@ -26,6 +26,7 @@ class MCClassicLevel:
     
         self.heading = struct.unpack('B',world[14:15])[0]
         self.pitch = struct.unpack('B',world[15:16])[0]
+    
         
     def setBlock(self,x,y,z,mode,block):
         

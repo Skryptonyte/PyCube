@@ -109,6 +109,9 @@ if __name__ == "__main__":
     heartBeatThread.start()
 
 
+
+    globalThread = threading.Thread(target=server.globalThread,args=(server, ))
+    globalThread.start()
     while True:
         conn, addr = s.accept()
         
@@ -118,8 +121,8 @@ if __name__ == "__main__":
         server.connList[playerID] = conn
         server.addPlayerID("",playerID,conn)
 
-        workerThread = threading.Thread(target=server.workerThread,args=(server, playerID, ))
-        workerThread.start()
+        #workerThread = threading.Thread(target=server.workerThread,args=(server, playerID, ))
+        #workerThread.start()
 
         t1 = threading.Thread(target=processClient,args=(playerID,conn,addr))
         print("New connection from address:",addr," with player ID: ", playerID)

@@ -1,12 +1,13 @@
 import struct
 import time
 import gzip
-
+import zlib
 import Commands
 
 def sendMessage(conn, server,data):
     playerID = server.connList.index(conn)
-    server.playerData[playerID].messageQueue.put((playerID, data))
+    #server.playerData[playerID].messageQueue.put((playerID, data))
+    server.messageQueue.put((playerID, data))
 playerCount = 0
 def ping(server,conn):
     data = struct.pack('!B',0x01)
@@ -14,8 +15,14 @@ def ping(server,conn):
     sendMessage(conn, server, data)
     #sendMessage(conn, server, data)
 
-def levelInitialize(server,conn):
+def levelInitialize(server,conn,playerID):
+    world = server.playerData[playerID].world
     data = struct.pack('!B',0x02)
+
+    # Check if client supports FastMap, if so append an int containing worldsize
+    if (server.playerData[playerID].CPE.get("FastMap",0)):
+        print("Intialize FastMap transfer")
+        data += struct.pack('!i',world.worldX*world.worldY*world.worldZ)
     #print("INITIALIZE LEVEL")
     try:
         sendMessage(conn, server, data)
@@ -23,11 +30,21 @@ def levelInitialize(server,conn):
         pass
 
 
-def levelChunk(server,conn,world):
+def levelChunk(playerID, server,conn,world):
     packetID = struct.pack('!B',0x03)
     percentComplete = struct.pack('!B',0)
 
-    worldData = gzip.compress(struct.pack('!i',world.worldX*world.worldY*world.worldZ) + world.world[18:])
+    worldData = None
+
+    if (server.playerData[playerID].CPE.get("FastMap",0)):
+        print("Level Load with FastMap enabled")
+        compress = zlib.compressobj(-1, zlib.DEFLATED, -15)
+        worldData = compress.compress(world.world[18:])
+        worldData += compress.flush()
+
+    else:
+        print("Level Load with FastMap disabled")
+        worldData = gzip.compress(struct.pack('!i',world.worldX*world.worldY*world.worldZ) + world.world[18:])
     
     index = 0
     while (index < len(worldData)):
@@ -78,8 +95,12 @@ def loadWorld(server, conn, world, playerID):
     despawnPlayerBroadcast(server, server.connList,playerID)
     server.playerData[playerID].world = world
 
-    levelInitialize(server,conn)
-    levelChunk(server,conn, world)
+    levelInitialize(server,conn,playerID)
+    levelChunk(playerID,server,conn, world)
+
+    if (server.playerData[playerID].CPE.get("EnvColors",0)):
+        CPE_envSetColor(playerID, conn, server, 0, 255, 0, 0)
+
     levelFinalize(server, conn,worldX, worldY, worldZ)
     positionUpdate(server, conn,-1,spawnX,spawnY,spawnZ,heading,pitch)
 
@@ -104,7 +125,7 @@ def spawnPlayer(server,conn,playerID,playerName,x,y,z,heading,pitch):
     playerName = playerName[0:64]
     playerNameConv = bytes(playerName+" "*(64 - len(playerName)),'utf-8')
     
-    print(x,y,z)
+    print("Spawn:",x,y,z)
     X = struct.pack('!h',x)
     Y = struct.pack('!h',y)
     Z = struct.pack('!h',z)
@@ -226,7 +247,7 @@ def updateUserType(server, conn, userType):
     except:
         pass
 
-def serverIdentification(playerID, conn, server):
+def serverIdentification(playerID, conn, server, motd):
 
     world = server.worlds["world"]
     connList = server.connList
@@ -234,18 +255,14 @@ def serverIdentification(playerID, conn, server):
     packetIDS = bytes((0,))
     serverProtocol = bytes((7,))
     serverName = bytes(server.SERVER_NAME + " "*(64 - len(server.SERVER_NAME)),'utf-8')
-    serverMOTD = bytes(server.SERVER_MOTD + " "*(64 - len(server.SERVER_MOTD)),'utf-8')
+    serverMOTD = bytes(motd + " "*(64 - len(motd)),'utf-8')
     userType = bytes((0,))
 
 
     newMessage = packetIDS + serverProtocol + serverName +serverMOTD + userType
     sendMessage(conn, server, newMessage)
 
-    loadWorld(server,conn,world,playerID)
-    serverMessageBroadcast(server,connList, server.playerData[playerID].playerName + " has joined the world.")
 
-    serverMessage(server,conn,server.SERVER_VERSION,1)
-    serverMessage(server,conn,"&cVery Unstable",2)
 
 def playerIdentification(playerID,data,conn,server):
 
@@ -273,7 +290,9 @@ def playerIdentification(playerID,data,conn,server):
         for cpeExtName in server.CPE:
             extEntryPacketServer(playerID,conn,server, cpeExtName,server.CPE[cpeExtName])
     else:
-        serverIdentification(playerID, conn, server)
+        serverIdentification(playerID, conn, server,server.SERVER_MOTD)
+        loadWorld(server,conn,world,playerID)
+        serverMessageBroadcast(server,connList, server.playerData[playerID].playerName + " has joined the world.")
     """
     packetIDS = bytes((0,))
     serverProtocol = bytes((7,))
@@ -407,8 +426,17 @@ def extEntryPacketClient(playerID, data, conn, server):
         print("Mutually Supported Extension:",trimmedName,"Version:",version)
     if (server.playerData[playerID]._extensionsLeft == 0):
         print("Finished CPE Handshake")
-        serverIdentification(playerID, conn, server)
+        serverIdentification(playerID, conn, server,server.SERVER_MOTD)
 
+        world = server.worlds["world"]
+        connList = server.connList
+
+        loadWorld(server,conn,world,playerID)
+        serverMessageBroadcast(server,connList, server.playerData[playerID].playerName + " has joined the world.")
+
+        serverMessage(server,conn,server.SERVER_VERSION,1)
+        serverMessage(server,conn,"&cVery Unstable",2)
+        
         CPE_clickDistance(playerID, conn, server, 320)
         CPE_customBlocks(playerID, conn, server)
 
@@ -434,6 +462,20 @@ def CPE_customBlocks_client(playerID, data, conn, server):
     packetID = struct.unpack('!B', data[0:1])
     supportLevel = struct.unpack('!B',data[1:2])
 
+def CPE_playerClicked_client(playerID, data, conn, server):
+    print("Player Click (Stubbed)")
+    packetID = struct.unpack('!B',data[0:1])
+
+def CPE_envSetColor(playerID, conn, server, type, r, g, b):
+    packetID = struct.pack('!B',0x19)
+    type = struct.pack('!B',type)
+    red = struct.pack('!h',r)
+    green = struct.pack('!h',g)
+    blue = struct.pack('!h',b)
+
+    packet = packetID + type+red + green + blue 
+
+    sendMessage(conn,server,packet)
 
 def CPE_twoWayPing_client(playerID, data, conn, server):
     packetID = struct.unpack('!B',data[0:1])
@@ -464,7 +506,8 @@ clientPacketDict = {0x0 : playerIdentification,
                     0x10: extInfoPacketClient,
                     0x11: extEntryPacketClient,
                     0x13: CPE_customBlocks_client,
+                    0x22: CPE_playerClicked_client,
                     0x2b: CPE_twoWayPing_client
                     }
 clientPacketLengths = {0x0: 131, 0x05: 9, 0x08: 10, 0x0d:66,
-                    0x10:67, 0x11: 69,0x13: 2, 0x2b: 4}
+                    0x10:67, 0x11: 69,0x13: 2, 0x22:15,0x2b: 4}
